@@ -15,8 +15,8 @@ This repository provides a versatile PyTorch training framework to simplify and 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/yourusername/your-repo.git
-    cd your-repo
+    git clone https://github.com/paraglondhe098/torchtrainer.git
+    cd torchtrainer
     ```
 
 2. Install the required dependencies:
