@@ -4,7 +4,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import List, Dict, Union, Optional, Callable
 from torch.cuda.amp import GradScaler, autocast
-from .metrics import *
+from metrics import *
 
 
 class Callback(ABC):
@@ -39,7 +39,8 @@ class Callback(ABC):
 
 class Trainer:
     def __init__(self, model: torch.nn.Module,
-                 epochs: int, criterion: torch.nn.Module,
+                 epochs: int,
+                 criterion: torch.nn.Module,
                  optimizer: torch.optim.Optimizer,
                  metrics: Optional[Union[str, List[str]]] = None,
                  metric_func_dict: Optional[Dict[str, Callable]] = None,
@@ -234,32 +235,32 @@ class Trainer:
         avg_batch_metrics = batch_metrics / self.num_batches
         return avg_batch_loss, avg_batch_metrics
 
+    @torch.no_grad()
     def __validation_fn(self, val_loader: torch.utils.data.DataLoader) -> (float, torch.Tensor):
         running_vloss = 0.
         running_vmetrics = torch.zeros(len(self.metrics))
         # Set to the evaluation mode
         self.model.eval()
         # Disable gradient computation and reduce memory consumption.
-        with torch.no_grad():
-            for vinputs, vlabels in val_loader:
-                vinputs, vlabels = vinputs.to(self.device), vlabels.to(self.device)
-                if self.scaler:
-                    with autocast():
-                        voutputs = self.model(vinputs)
-                        vloss = self.criterion(voutputs, vlabels)
-                else:
+        for vinputs, vlabels in val_loader:
+            vinputs, vlabels = vinputs.to(self.device), vlabels.to(self.device)
+            if self.scaler:
+                with autocast():
                     voutputs = self.model(vinputs)
                     vloss = self.criterion(voutputs, vlabels)
-                running_vloss += vloss.item()
-                for i, metric_fn in enumerate(self.metric_fns):
-                    running_vmetrics[i] += metric_fn(vlabels, voutputs)
+            else:
+                voutputs = self.model(vinputs)
+                vloss = self.criterion(voutputs, vlabels)
+            running_vloss += vloss.item()
+            for i, metric_fn in enumerate(self.metric_fns):
+                running_vmetrics[i] += metric_fn(vlabels, voutputs)
 
         avg_vloss = running_vloss / len(val_loader)
         avg_vmetrics = running_vmetrics / len(val_loader)
         return avg_vloss, avg_vmetrics
 
-    def train(self, train_loader: torch.utils.data.DataLoader, val_loader: torch.utils.data.DataLoader,
-              train_fn: Optional[Callable] = None, validation_fn: Optional[Callable] = None) -> None:
+    def fit(self, train_loader: torch.utils.data.DataLoader, val_loader: torch.utils.data.DataLoader,
+            train_fn: Optional[Callable] = None, validation_fn: Optional[Callable] = None) -> None:
         """
         Trains the model for the specified number of epochs.
 
