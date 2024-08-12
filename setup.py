@@ -7,7 +7,7 @@ setup(
     install_requires=[
         # List your dependencies here
     ],
-    description='PyTorch Training Framework: A customizable PyTorch training loop class with support for metrics tracking, early stopping, and callbacks. Includes methods for multi-class and binary accuracy, precision, recall, and R² score calculations.',
+    description='A custom pytorch training loop, with custom and in built Callbacks, better logging.',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='code_moon',
