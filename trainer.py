@@ -4,7 +4,7 @@ import copy
 from abc import ABC, abstractmethod
 from typing import List, Dict, Union, Optional, Callable
 from torch.cuda.amp import GradScaler, autocast
-from metrics import *
+from .metrics import *
 
 
 class Callback(ABC):
