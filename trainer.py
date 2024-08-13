@@ -457,25 +457,25 @@ class Trainer:
         if self.best_model_weights is None:
             self.best_model_weights = copy.deepcopy(self.model.state_dict())
 
-    # def run_per_epoch(self, pos=1) -> Callable:
-    #     class Custom(Callback):
-    #         def __init__(self):
-    #             super().__init__(pos=pos)
-    #
-    #         @staticmethod
-    #         def temp():
-    #             pass
-    #
-    #         def runner(self, trainer: Trainer) -> Optional[str]:
-    #             self.temp()
-    #             return None
-    #
-    #     def decorator(func: Callable) -> Callable:
-    #         Custom.temp = func
-    #         return func
-    #
-    #     self.callbacks.append(Custom())
-    #     return decorator
+    @staticmethod
+    def run_per_epoch(pos):
+        ct = CallbackTemplate(pos)
+
+        def decorator(func: Callable) -> Callable:
+            ct.fn = func
+            return func
+
+        return decorator
+
+
+class CallbackTemplate(Callback):
+    def __init__(self, pos=0):
+        self.fn = None
+        super().__init__(pos=pos)
+
+    def runner(self, trainer: Trainer) -> Optional[str]:
+        self.fn(trainer)
+        return None
 
 
 class IntraEpochReport(Callback):
@@ -607,7 +607,6 @@ class EarlyStopping(Callback):
 
                     return final_message
         return None
-
 
 # class GradientClipping(Callback):
 #     def __init__(self, clipping_value):
