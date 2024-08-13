@@ -457,12 +457,12 @@ class Trainer:
         if self.best_model_weights is None:
             self.best_model_weights = copy.deepcopy(self.model.state_dict())
 
-    @staticmethod
-    def run_per_epoch(pos):
+    def run_per_epoch(self, pos):
         ct = CallbackTemplate(pos)
 
         def decorator(func: Callable) -> Callable:
             ct.fn = func
+            self.add_callback(ct)
             return func
 
         return decorator
