@@ -2,23 +2,23 @@ import torch
 import time
 import copy
 from abc import ABC, abstractmethod
-from typing import List, Dict, Union, Optional, Callable
+from typing import List, Dict, Union, Optional, Callable, Tuple
 from torch.cuda.amp import GradScaler, autocast
 
 
-def multi_class_accuracy_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
+def multiclass_accuracy_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
     predictions = torch.argmax(raw_predictions, dim=-1)
     correct = (predictions == labels).sum().item()
     return correct / labels.size(0)
 
 
-def bi_class_accuracy_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
+def binary_accuracy_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
     predictions = torch.round(torch.sigmoid(raw_predictions))  # Assuming threshold of 0.5
     correct = (predictions == labels).sum().item()
     return correct / labels.size(0)
 
 
-def precision_score_multiclass(labels: torch.Tensor, raw_predictions: torch.Tensor,
+def multiclass_precision_score(labels: torch.Tensor, raw_predictions: torch.Tensor,
                                average: str = 'macro') -> Optional[Union[float, torch.tensor]]:
     y_pred = torch.argmax(raw_predictions, dim=1)
     classes = torch.unique(labels)
@@ -52,14 +52,14 @@ def precision_score_multiclass(labels: torch.Tensor, raw_predictions: torch.Tens
         return precision_per_class
 
 
-def precision_score_binary(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
+def binary_precision_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
     predictions = torch.round(torch.sigmoid(raw_predictions))
     tp = torch.sum((labels == 1) & (predictions == 1)).item()
     fp = torch.sum((labels == 0) & (predictions == 1)).item()
     return tp / (tp + fp) if tp + fp > 0 else 0.0  # Modified conditional
 
 
-def recall_score_multiclass(labels: torch.Tensor, raw_predictions: torch.Tensor,
+def multiclass_recall_score(labels: torch.Tensor, raw_predictions: torch.Tensor,
                             average: str = 'macro') -> Optional[Union[float, torch.tensor]]:
     # Convert logits to predicted class labels
     predictions = torch.argmax(raw_predictions, dim=1)
@@ -99,7 +99,7 @@ def recall_score_multiclass(labels: torch.Tensor, raw_predictions: torch.Tensor,
         return recall_per_class
 
 
-def recall_score_binary(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
+def binary_recall_score(labels: torch.Tensor, raw_predictions: torch.Tensor) -> float:
     # Convert logits to predicted class labels (assuming a threshold of 0.5)
     predictions = torch.round(torch.sigmoid(raw_predictions))
 
@@ -128,6 +128,14 @@ class Callback(ABC):
     """
 
     def __init__(self, pos: int = 1):
+        """
+        The position at which the callback will run
+        Options:
+            0 - After training 1 batch (loss.backward() and optimizer.step(), before evaluation/validation (runs for each batch in each epoch) --> return values are not used.
+            1 (default) - After validation step. Runs once per epoch. (best for metric tracking, logging, etc.) --> return values (str) are used to print at the end of the epoch
+            2 - After training step and before validation step. Runs once per epoch. --> return values are not used.
+            Note - for some callbacks, returned value is not used, you can still print within it.
+        """
         self.pos = pos
 
     @abstractmethod
@@ -159,7 +167,7 @@ class Trainer:
                  optimizer: torch.optim.Optimizer,
                  metrics: Optional[Union[str, List[str]]] = None,
                  metric_func_dict: Optional[Dict[str, Callable]] = None,
-                 uni_output: bool = False, callbacks: Optional[List[Callback]] = None,
+                 binary_output: bool = False, callbacks: Optional[List[Callback]] = None,
                  display_time_elapsed: bool = False,
                  device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                  roff: int = 5, report_in_one_line: bool = True,
@@ -176,7 +184,7 @@ class Trainer:
             optimizer (torch.optim.Optimizer): The optimizer to use during training.
             metrics (list, optional): A list of metric names to track during training. Defaults to None.
             metric_func_dict (dict, optional): A dictionary mapping metric names to their corresponding functions. Defaults to None.
-            uni_output (bool, optional): If True, assumes the model has a single output. Defaults to False.
+            binary_output (bool, optional): If True, assumes the model has a single output. Defaults to False.
             callbacks (list, optional): A list of callback instances to be executed during training. Defaults to None.
             display_time_elapsed (bool, optional): If True, displays the time elapsed after each epoch. Defaults to False.
             device (torch.device, optional): The device to train the model on. Defaults to GPU (if available, else CPU).
@@ -197,9 +205,9 @@ class Trainer:
 
         metrics = metrics if isinstance(metrics, list) else [metrics]
         prior_metric_fn_dict = {
-            'accuracy': bi_class_accuracy_score if uni_output else multi_class_accuracy_score,
-            'precision': precision_score_binary if uni_output else precision_score_multiclass,
-            'recall': recall_score_binary if uni_output else recall_score_multiclass,
+            'accuracy': binary_accuracy_score if binary_output else multiclass_accuracy_score,
+            'precision': binary_precision_score if binary_output else multiclass_precision_score,
+            'recall': binary_recall_score if binary_output else multiclass_recall_score,
             'r2_score': r2_score,
             None: lambda a, b: 0.}
         if metric_func_dict is not None:
@@ -211,11 +219,12 @@ class Trainer:
                 filtered_metrics.append(metric)
                 metric_fns.append(prior_metric_fn_dict[metric])
             else:
-                print(f"Please provide a scoring function for your metric : {metric} using metric_fn_dict argument\n"
-                      f"Example \n  >>> trainer = Trainer(other_args,metric_fn_dict = {'{'}{metric} : {metric}_fn{'}'})\n"
-                      f"Or use add_metric method\n"
-                      f"  >>> trainer.add_metric({metric},{metric}_fn)\n"
-                      f"Note : {metric}_fn expected to return float ")
+                error_message = f"Please provide a scoring function for your metric : {metric} using metric_fn_dict argument\n" + \
+                                f"Example \n  >>> trainer = Trainer(other_args,metric_fn_dict = {'{'}{metric} : {metric}_fn{'}'})\n" + \
+                                f"Or use add_metric method\n" + \
+                                f"  >>> trainer.add_metric({metric},{metric}_fn)\n" + \
+                                f"Note : {metric}_fn expected to return float. Convert tensors to float using T.item() for single output for better logging "
+                raise AttributeError(error_message)
 
         self.metrics = filtered_metrics
         self.metric_fns = metric_fns
@@ -307,7 +316,7 @@ class Trainer:
         responses = [callback.run(self, pos) for callback in self.callbacks]
         return [response for response in responses if response]
 
-    def __train_fn(self, train_loader: torch.utils.data.DataLoader) -> (float, torch.Tensor):
+    def __train_fn(self, train_loader: torch.utils.data.DataLoader) -> Tuple[float, torch.Tensor]:
 
         # Initializing Metrics
         batch_loss = 0.
@@ -320,7 +329,7 @@ class Trainer:
         for self.b, (inputs, labels) in enumerate(train_loader):
             inputs, labels = inputs.to(self.device), labels.to(self.device)
 
-            # The real training
+            # One Batch Training
             self.optimizer.zero_grad()
             if self.scaler:
                 # Mixed precision training
@@ -344,14 +353,14 @@ class Trainer:
                     metric_value = metric_fn(labels, outputs)
                     batch_metrics[i] += metric_value
                     self.running_metrics[i] += metric_value
-            self.__run_callbacks(0)
+            self.__run_callbacks(pos=0)
 
         avg_batch_loss = batch_loss / self.num_batches
         avg_batch_metrics = batch_metrics / self.num_batches
         return avg_batch_loss, avg_batch_metrics
 
     @torch.no_grad()
-    def __validation_fn(self, val_loader: torch.utils.data.DataLoader) -> (float, torch.Tensor):
+    def __validation_fn(self, val_loader: torch.utils.data.DataLoader) -> Tuple[float, torch.Tensor]:
         running_vloss = 0.
         running_vmetrics = torch.zeros(len(self.metrics))
         # Set to the evaluation mode
@@ -395,7 +404,7 @@ class Trainer:
         self.batch_size = train_loader.batch_size
         start_time = time.time()
         on_gpu = True if self.device.type == 'cuda' else False
-        # Display rounded of vales upto roff
+        # The main Training loop
         for epoch in range(self.epochs):
 
             if on_gpu and self.clear_cuda_cache:
@@ -410,6 +419,8 @@ class Trainer:
                 for i, metric in enumerate(self.metrics):
                     self.History[metric].append(current_metrics[i].item())
 
+            self.__run_callbacks(pos=2)
+
             # Validate model
             current_vloss, current_vmetrics = validation_fn(val_loader)
             self.History['vloss'].append(current_vloss)
@@ -418,7 +429,7 @@ class Trainer:
                     self.History[f'v{metric}'].append(current_vmetrics[i].item())
 
             # Run callbacks
-            responses = self.__run_callbacks(1)
+            responses = self.__run_callbacks(pos=1)
 
             print(self.epoch_message)
             long_message = f"LOSS : train {round(current_loss, self.roff)} validation {round(current_vloss, self.roff)}"
