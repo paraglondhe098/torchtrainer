@@ -457,21 +457,6 @@ class Trainer:
         if self.best_model_weights is None:
             self.best_model_weights = copy.deepcopy(self.model.state_dict())
 
-    def run_per_epoch(self, pos=1) -> Callable:
-        class Custom(Callback):
-            def __init__(self):
-                super().__init__(pos=pos)
-
-            def runner(self, trainer: Trainer) -> Optional[str]:
-                pass
-
-        def decorator(func: Callable) -> Callable:
-            Custom.runner = func
-            return func
-
-        self.callbacks.append(Custom())
-        return decorator
-
 
 class IntraEpochReport(Callback):
 
@@ -604,37 +589,37 @@ class EarlyStopping(Callback):
         return None
 
 
-class GradientClipping(Callback):
-    def __init__(self, clipping_value):
-        super().__init__(pos=0)
-        self.clipping_value = clipping_value
-
-    def runner(self, trainer: Trainer):
-        torch.nn.utils.clip_grad_value_(trainer.model.parameters(), self.clipping_value)
-
-
-class LRScheduler(Callback):
-    def __init__(self, scheduler):
-        super().__init__(pos=0)
-        self.scheduler = scheduler
-
-    def runner(self, trainer: Trainer):
-        self.scheduler.step()
-        return None
-
-
-class LRTracker(Callback):
-    def __init__(self):
-        super().__init__(pos=1)
-
-    @staticmethod
-    def get_lr(optimizer):
-        for param_group in optimizer.param_groups:
-            return param_group['lr']
-
-    def runner(self, trainer: Trainer):
-        try:
-            trainer.History['lr'].append(self.get_lr(trainer.optimizer))
-        except Exception:
-            trainer.History['lr'] = [self.get_lr(trainer.optimizer)]
-        return None
+# class GradientClipping(Callback):
+#     def __init__(self, clipping_value):
+#         super().__init__(pos=0)
+#         self.clipping_value = clipping_value
+#
+#     def runner(self, trainer: Trainer):
+#         torch.nn.utils.clip_grad_value_(trainer.model.parameters(), self.clipping_value)
+#
+#
+# class LRScheduler(Callback):
+#     def __init__(self, scheduler):
+#         super().__init__(pos=0)
+#         self.scheduler = scheduler
+#
+#     def runner(self, trainer: Trainer):
+#         self.scheduler.step()
+#         return None
+#
+#
+# class LRTracker(Callback):
+#     def __init__(self):
+#         super().__init__(pos=1)
+#
+#     @staticmethod
+#     def get_lr(optimizer):
+#         for param_group in optimizer.param_groups:
+#             return param_group['lr']
+#
+#     def runner(self, trainer: Trainer):
+#         try:
+#             trainer.History['lr'].append(self.get_lr(trainer.optimizer))
+#         except Exception:
+#             trainer.History['lr'] = [self.get_lr(trainer.optimizer)]
+#         return None
