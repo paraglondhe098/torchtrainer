@@ -457,6 +457,26 @@ class Trainer:
         if self.best_model_weights is None:
             self.best_model_weights = copy.deepcopy(self.model.state_dict())
 
+    # def run_per_epoch(self, pos=1) -> Callable:
+    #     class Custom(Callback):
+    #         def __init__(self):
+    #             super().__init__(pos=pos)
+    #
+    #         @staticmethod
+    #         def temp():
+    #             pass
+    #
+    #         def runner(self, trainer: Trainer) -> Optional[str]:
+    #             self.temp()
+    #             return None
+    #
+    #     def decorator(func: Callable) -> Callable:
+    #         Custom.temp = func
+    #         return func
+    #
+    #     self.callbacks.append(Custom())
+    #     return decorator
+
 
 class IntraEpochReport(Callback):
 
