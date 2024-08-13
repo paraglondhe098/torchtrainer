@@ -172,8 +172,7 @@ class Trainer:
                  device: torch.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu'),
                  roff: int = 5, report_in_one_line: bool = True,
                  clear_cuda_cache: bool = True,
-                 mixed_precision_training: bool = True,
-                 grad_clip: Optional[int] = None):
+                 mixed_precision_training: bool = True):
 
         """
         Initializes the pytorch training loop class.
@@ -237,8 +236,6 @@ class Trainer:
         self.device = device
         self.clear_cuda_cache = clear_cuda_cache
         self.scaler = GradScaler() if (self.device.type == 'cuda' and mixed_precision_training) else None
-
-        self.grad_clip = grad_clip
 
         self.roff = roff
         self.STOPPER = False
@@ -456,6 +453,25 @@ class Trainer:
         self.History['epochs'] = [epoch for epoch in range(self.current_epoch)]
         if self.best_model_weights is None:
             self.best_model_weights = copy.deepcopy(self.model.state_dict())
+
+    @torch.no_grad()
+    def predict(self, data):
+        data = data.to(self.device)
+        return self.model(data)
+
+    def plot(self, x=None, y1=None, y2=None):
+        import matplotlib.pyplot as plt
+        if not x and not y1 and not y2:
+            print(f"Options for plotting are {list(self.History.keys())}")
+            x = input("Select x")
+            y1 = input("Select y1")
+            y2 = input("Select y2")
+        plt.xlabel(x)
+        plt.plot(self.History[x], self.History[y1], c='b', label=y1)
+        if y2:
+            plt.plot(self.History[x], self.History[y2], c='r', label=y2)
+        plt.legend()
+        plt.show()
 
     def add_event(self, pos: int):
         ct = CallbackTemplate(pos)
