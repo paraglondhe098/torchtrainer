@@ -635,8 +635,8 @@ class LRTracker(Callback):
             return param_group['lr']
 
     def runner(self, trainer: Trainer):
-        try:
+        if trainer.current_epoch > 0:
             trainer.History['lr'].append(self.get_lr(trainer.optimizer))
-        except Exception:
+        else:
             trainer.History['lr'] = [self.get_lr(trainer.optimizer)]
         return None
